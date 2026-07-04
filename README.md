@@ -24,32 +24,9 @@
 | Configuration | [→ Read](https://github.com/Zilleali/mikrotik-laravel/wiki/Configuration) |
 | Multi-Router Setup | [→ Read](https://github.com/Zilleali/mikrotik-laravel/wiki/Multi-Router-Setup) |
 | SSL Setup | [→ Read](https://github.com/Zilleali/mikrotik-laravel/wiki/SSL-Setup) |
+| Testing with MikrotikFake | [→ Read](https://github.com/Zilleali/mikrotik-laravel/wiki/Testing) |
+| Laravel Pulse Integration | [→ Read](https://github.com/Zilleali/mikrotik-laravel/wiki/Pulse-Integration) |
 | Changelog | [→ Read](https://github.com/Zilleali/mikrotik-laravel/wiki/Changelog) |
-
-## Table of Contents
-
-- [Features](#features)
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Quick Start](#quick-start)
-- [PPPoE Manager](#pppoe-manager)
-- [Hotspot Manager](#hotspot-manager)
-- [Queue Manager](#queue-manager)
-- [Firewall Manager](#firewall-manager)
-- [System Manager](#system-manager)
-- [Diagnostics Manager](#diagnostics-manager)
-- [Export Manager](#export-manager)
-- [Generator Streaming](#generator-streaming)
-- [Multi-Router Setup](#multi-router-setup)
-- [Events](#events)
-- [Testing with MikrotikFake](#testing-with-mikrotikfake)
-- [Laravel Pulse Integration](#laravel-pulse-integration)
-- [Filament Integration](#filament-integration)
-- [Testing](#testing)
-- [Changelog](#changelog)
-- [Contributing](#contributing)
-- [License](#license)
 
 ---
 
@@ -60,27 +37,19 @@
 - **Queue Management** — simple/tree queues, bulk bandwidth limits
 - **Firewall Management** — filter rules, NAT, mangle, address lists
 - **System Management** — resources, health, logs, ping, reboot
-- **Interface Management** — traffic monitoring, VLANs, enable/disable
-- **DHCP Management** — leases, servers, static assignments
-- **Wireless Management** — registration table, access list, client count
-- **IP Pool Management** — address ranges, usage tracking
-- **RADIUS Management** — servers, incoming CoA config
-- **Router User Management** — Winbox/SSH/API users, groups
-- **VPN Management** — WireGuard peers, L2TP/PPTP sessions
-- **Bridge Management** — bridges, ports, host table, L2 filters
-- **Diagnostics** — health check, ping, API latency, connection info *(v1.7.0)*
+- **Interface, DHCP, Wireless, IP Pool, RADIUS, VPN, Bridge** — full CRUD
+- **Diagnostics** — health check, API latency, ping, connection info *(v1.7.0)*
 - **SSH Config Export** — full/section export, diff configs *(v1.7.0)*
 - **Generator Streaming** — lazy row-by-row iteration for large datasets *(v1.7.0)*
-- **SSL Connection** — TLS encrypted API connection (port 8729)
-- **ConnectionPool** — persistent connections, auto-reconnect
-- **Widget Data Classes** — ready-to-use data providers for dashboards
-- **Multi-Router Support** — manage multiple routers from one app
-- **Caching Layer** — reduce router API load automatically
-- **Retry Mechanism** — configurable attempts + delay
-- **Laravel Events** — SessionCreated, SessionDisconnected, RouterUnreachable
-- **Artisan Commands** — mikrotik:ping, mikrotik:sync, mikrotik:monitor
 - **MikrotikFake** — drop-in test helper, zero manual mocking *(v1.7.0)*
 - **Laravel Pulse Card** — router health dashboard widget *(v1.7.0)*
+- **SSL Connection** — TLS encrypted API (port 8729)
+- **Multi-Router Support** — manage multiple routers from one app
+- **Caching, Retry, Rate Limiting** — production-ready reliability
+- **Laravel Events** — SessionCreated, SessionDisconnected, RouterUnreachable
+- **Artisan Commands** — mikrotik:ping, mikrotik:sync, mikrotik:monitor
+
+---
 
 ## Available Managers
 
@@ -108,37 +77,10 @@
 | SyslogManager | `MikroTik::syslog()` | v1.2.0 |
 | SessionMonitor | `MikroTik::sessionMonitor()` | v1.2.0 |
 | UsageTracker | `MikroTik::usageTracker()` | v1.2.0 |
-| RateLimiter | `new RateLimiter()` | v1.2.0 |
 | DiagnosticsManager | `MikroTik::diagnostics()` | v1.7.0 |
 | ExportManager | `MikroTik::export()` | v1.7.0 |
 
 ---
-
-## SSL Connection
-
-For production ISPs — enable TLS encrypted API connection:
-
-```env
-MIKROTIK_SSL=true
-MIKROTIK_SSL_VERIFY=false
-```
-
-```php
-// Auto-selected from config
-MikroTik::pppoe()->getActiveSessions(); // uses SSL if configured
-
-// Manual
-$client = new RouterosClientSSL(
-    host:       '192.168.88.1',
-    verifyPeer: false, // accept self-signed cert
-);
-```
-
-Enable API-SSL on router:
-
-```text
-IP → Services → api-ssl → enabled
-```
 
 ## Requirements
 
@@ -149,15 +91,7 @@ IP → Services → api-ssl → enabled
 | RouterOS | 6.43+ \| 7.x |
 | MikroTik API | Port 8728 (plain) or 8729 (SSL) |
 
-> Make sure the **API service is enabled** on your MikroTik router:
-> `IP → Services → api → enabled`
-
-**Optional dependencies:**
-
-| Package | Purpose |
-| --- | --- |
-| `laravel/pulse: ^1.0` | RouterHealth Pulse card |
-| `spatie/ssh: ^1.8` | ExportManager (SSH-based config export) |
+Optional: `laravel/pulse: ^1.0` for the Pulse card — `spatie/ssh: ^1.8` for ExportManager.
 
 ---
 
@@ -167,72 +101,17 @@ IP → Services → api-ssl → enabled
 composer require zilleali/mikrotik-laravel
 ```
 
-Publish the config file:
-
 ```bash
 php artisan vendor:publish --tag=mikrotik-config
 ```
 
----
-
-## Configuration
-
-Edit `config/mikrotik.php`:
-
-```php
-return [
-
-    /*
-    |--------------------------------------------------------------------------
-    | Default Router Connection
-    |--------------------------------------------------------------------------
-    | Used when no specific router is selected via MikroTik::router('name')
-    */
-
-    'default' => env('MIKROTIK_HOST', '192.168.88.1'),
-
-    'host'     => env('MIKROTIK_HOST',    '192.168.88.1'),
-    'port'     => env('MIKROTIK_PORT',    8728),
-    'username' => env('MIKROTIK_USER',    'admin'),
-    'password' => env('MIKROTIK_PASS',    ''),
-    'timeout'  => env('MIKROTIK_TIMEOUT', 10),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Multiple Routers
-    |--------------------------------------------------------------------------
-    | Define named routers for multi-site ISP setups.
-    | Access via: MikroTik::router('branch')->pppoe()->getSessions()
-    */
-
-    'routers' => [
-        'main' => [
-            'host'     => env('MIKROTIK_MAIN_HOST', '192.168.88.1'),
-            'port'     => env('MIKROTIK_MAIN_PORT', 8728),
-            'username' => env('MIKROTIK_MAIN_USER', 'admin'),
-            'password' => env('MIKROTIK_MAIN_PASS', ''),
-            'timeout'  => 10,
-        ],
-        'branch' => [
-            'host'     => env('MIKROTIK_BRANCH_HOST', '10.0.0.1'),
-            'port'     => env('MIKROTIK_BRANCH_PORT', 8728),
-            'username' => env('MIKROTIK_BRANCH_USER', 'admin'),
-            'password' => env('MIKROTIK_BRANCH_PASS', ''),
-            'timeout'  => 10,
-        ],
-    ],
-
-];
-```
-
-Add to your `.env`:
+Add to `.env`:
 
 ```env
 MIKROTIK_HOST=192.168.88.1
 MIKROTIK_PORT=8728
 MIKROTIK_USER=admin
 MIKROTIK_PASS=your_password
-MIKROTIK_TIMEOUT=10
 ```
 
 ---
@@ -242,715 +121,40 @@ MIKROTIK_TIMEOUT=10
 ```php
 use ZillEAli\MikrotikLaravel\Facades\MikroTik;
 
-// PPPoE — get all active sessions
+// PPPoE
 $sessions = MikroTik::pppoe()->getActiveSessions();
-
-// Hotspot — get active hosts count
-$count = count(MikroTik::hotspot()->getActiveHosts());
-
-// System — get CPU load
-$cpu = MikroTik::system()->getCpuLoad();
-
-// Queue — set bandwidth limit
-MikroTik::queue()->setLimit('ali-home', '10M', '10M');
-
-// Firewall — block an IP
-MikroTik::firewall()->addToAddressList('1.2.3.4', 'blocked');
-```
-
----
-
-## PPPoE Manager
-
-### Get secrets (users)
-
-```php
-// All secrets
-$secrets = MikroTik::pppoe()->getSecrets();
-
-// Single secret by name
-$secret = MikroTik::pppoe()->getSecret('ali-home');
-
-// Find by IP address
-$user = MikroTik::pppoe()->getSecretByIp('10.0.0.45');
-```
-
-### Create / update / delete
-
-```php
-// Create new PPPoE user
-MikroTik::pppoe()->createSecret([
-    'name'     => 'ali-home',
-    'password' => 'pass123',
-    'service'  => 'pppoe',
-    'profile'  => '10mbps',
-    'comment'  => 'Ali House Connection',
-]);
-
-// Update user
-MikroTik::pppoe()->updateSecret('ali-home', [
-    'password' => 'newpass',
-    'profile'  => '20mbps',
-]);
-
-// Delete user
-MikroTik::pppoe()->deleteSecret('ali-home');
-```
-
-### Enable / disable
-
-```php
-MikroTik::pppoe()->enableSecret('ali-home');
 MikroTik::pppoe()->disableSecret('ali-home');
 
-// Bulk operations
-MikroTik::pppoe()->bulkEnable(['user1', 'user2', 'user3']);
-MikroTik::pppoe()->bulkDisable(['user1', 'user2']);
-```
-
-### Active sessions
-
-```php
-// Get all active sessions
-$sessions = MikroTik::pppoe()->getActiveSessions();
-
-// Kick (disconnect) a user
-MikroTik::pppoe()->kickSession('ali-home');
-
-// Bulk kick
-MikroTik::pppoe()->bulkKick(['user1', 'user2']);
-```
-
-### Profiles
-
-```php
-// Get all profiles
-$profiles = MikroTik::pppoe()->getProfiles();
-
-// Create a profile
-MikroTik::pppoe()->createProfile([
-    'name'             => '20mbps',
-    'rate-limit'       => '20M/20M',
-    'session-timeout'  => '30d',
-]);
-```
-
----
-
-## Hotspot Manager
-
-### Users
-
-```php
-// Get all hotspot users
-$users = MikroTik::hotspot()->getUsers();
-
-// Get single user
-$user = MikroTik::hotspot()->getUser('guest001');
-
-// Create user
-MikroTik::hotspot()->createUser([
-    'name'     => 'guest001',
-    'password' => 'pass123',
-    'profile'  => 'default',
-    'comment'  => '1 hour voucher',
-]);
-
-// Update user
-MikroTik::hotspot()->updateUser('guest001', [
-    'profile' => 'premium',
-]);
-
-// Delete user
-MikroTik::hotspot()->deleteUser('guest001');
-
-// Enable / disable
-MikroTik::hotspot()->enableUser('guest001');
-MikroTik::hotspot()->disableUser('guest001');
-```
-
-### Active hosts
-
-```php
-// Get all active hotspot sessions
+// Hotspot
 $hosts = MikroTik::hotspot()->getActiveHosts();
 
-// Kick a host
-MikroTik::hotspot()->kickHost('guest001');
-```
+// System
+$cpu = MikroTik::system()->getCpuLoad();
 
-### Voucher generation
-
-```php
-// Generate 10 vouchers with default profile
-$vouchers = MikroTik::hotspot()->generateVouchers(10);
-
-// With custom prefix and profile
-$vouchers = MikroTik::hotspot()->generateVouchers(
-    count:   20,
-    profile: 'premium',
-    prefix:  'VIP',
-);
-
-// Each voucher:
-// ['name' => 'VIP3F8A2C', 'password' => 'A1B2C3D4', 'profile' => 'premium']
-
-// Print vouchers or export to PDF
-foreach ($vouchers as $voucher) {
-    echo "User: {$voucher['name']} | Pass: {$voucher['password']}";
-}
-```
-
----
-
-## Queue Manager
-
-### Simple queues
-
-```php
-// Get all queues
-$queues = MikroTik::queue()->getSimpleQueues();
-
-// Get single queue
-$queue = MikroTik::queue()->getSimpleQueue('ali-home');
-
-// Create queue
-MikroTik::queue()->createSimpleQueue([
-    'name'      => 'ali-home',
-    'target'    => '10.0.0.45/32',
-    'max-limit' => '10M/10M',
-    'comment'   => 'Ali House',
-]);
-
-// Update queue
-MikroTik::queue()->updateQueue('ali-home', [
-    'max-limit' => '20M/20M',
-]);
-
-// Delete queue
-MikroTik::queue()->deleteQueue('ali-home');
-
-// Enable / disable
-MikroTik::queue()->enableQueue('ali-home');
-MikroTik::queue()->disableQueue('ali-home');
-```
-
-### Bandwidth shortcuts
-
-```php
-// Set upload/download limit quickly
+// Queue
 MikroTik::queue()->setLimit('ali-home', '10M', '10M');
 
-// Bulk set limits for multiple users
-MikroTik::queue()->bulkSetLimit([
-    ['name' => 'ali-home',   'ul' => '10M', 'dl' => '10M'],
-    ['name' => 'zain-fiber', 'ul' => '20M', 'dl' => '20M'],
-    ['name' => 'shop-001',   'ul' => '5M',  'dl' => '5M'],
-]);
-```
-
-### Tree queues
-
-```php
-// Get HTB tree queues
-$treeQueues = MikroTik::queue()->getTreeQueues();
-
-// Create tree queue
-MikroTik::queue()->createTreeQueue([
-    'name'      => 'isp-parent',
-    'parent'    => 'global',
-    'max-limit' => '100M',
-]);
-```
-
----
-
-## Firewall Manager
-
-### Filter rules
-
-```php
-// Get all filter rules
-$rules = MikroTik::firewall()->getFilterRules();
-
-// Add filter rule
-MikroTik::firewall()->addFilterRule([
-    'chain'       => 'input',
-    'action'      => 'drop',
-    'src-address' => '1.2.3.4',
-    'comment'     => 'block attacker',
-]);
-```
-
-### NAT rules
-
-```php
-// Get NAT rules
-$nat = MikroTik::firewall()->getNatRules();
-
-// Add masquerade rule
-MikroTik::firewall()->addNatRule([
-    'chain'         => 'srcnat',
-    'action'        => 'masquerade',
-    'out-interface' => 'ether1',
-]);
-```
-
-### Mangle rules
-
-```php
-// Get mangle rules
-$mangle = MikroTik::firewall()->getMangleRules();
-
-// Add mangle rule
-MikroTik::firewall()->addMangleRule([
-    'chain'               => 'prerouting',
-    'action'              => 'mark-connection',
-    'new-connection-mark' => 'isp1',
-]);
-```
-
-### Address lists
-
-```php
-// Get all address lists
-$lists = MikroTik::firewall()->getAddressLists();
-
-// Get specific list
-$blocked = MikroTik::firewall()->getAddressList('blocked');
-
-// Add IP to list
-MikroTik::firewall()->addToAddressList('1.2.3.4', 'blocked', 'spam IP');
-
-// Remove IP from list
-MikroTik::firewall()->removeFromAddressList('1.2.3.4', 'blocked');
-
-// Check if IP is in list
-if (MikroTik::firewall()->isIpInList('1.2.3.4', 'blocked')) {
-    echo 'IP is blocked';
-}
-```
-
----
-
-## System Manager
-
-### Resources
-
-```php
-// Full resource info
-$resources = MikroTik::system()->getResources();
-// returns: cpu-load, free-memory, total-memory, uptime, version, board-name
-
-// Shortcuts
-$cpu    = MikroTik::system()->getCpuLoad();     // int: 0-100
-$uptime = MikroTik::system()->getUptime();      // string: "14d6h30m"
-$ram    = MikroTik::system()->getFreeMemory();  // int: bytes
-$ver    = MikroTik::system()->getVersion();     // string: "7.14.3"
-```
-
-### Health
-
-```php
-// Hardware health (supported routers only)
-$health = MikroTik::system()->getHealth();
-// returns: temperature, voltage, fan-speed
-
-$temp = MikroTik::system()->getTemperature(); // int: Celsius or null
-```
-
-### Identity & logs
-
-```php
-// Router hostname
-$name = MikroTik::system()->getIdentity();  // "Main-Router"
-
-// Set identity
-MikroTik::system()->setIdentity('Main-Router');
-
-// Get logs (all)
-$logs = MikroTik::system()->getLogs();
-
-// Get last 20 logs
-$logs = MikroTik::system()->getLogs(20);
-
-// Filter by topic
-$pppoe = MikroTik::system()->getLogsByTopic('pppoe', limit: 10);
-```
-
-### Ping & reboot
-
-```php
-// Ping from the router
-$result = MikroTik::system()->ping('8.8.8.8', count: 4);
-
-// Check reachability
-if (MikroTik::system()->isReachable('8.8.8.8')) {
-    echo 'Internet is up';
-}
-
-// Reboot router (WARNING: disconnects all sessions)
-MikroTik::system()->reboot();
-```
-
----
-
-## Diagnostics Manager
-
-> Added in **v1.7.0** — lightweight health checks and API diagnostics.
-
-```php
-// Quick health check — returns bool
-$alive = MikroTik::diagnostics()->isAlive();
-
-// Structured ping result
-$result = MikroTik::diagnostics()->ping();
-// [
-//     'host'       => '192.168.88.1',
-//     'port'       => 8728,
-//     'connected'  => true,
-//     'alive'      => true,
-//     'latency_ms' => 4,
-//     'error'      => null,
-// ]
-
-// Average API latency over N samples (milliseconds)
-$latencyMs = MikroTik::diagnostics()->latency(samples: 5);
-
-// Raw RouterOS response (debugging)
-$words = MikroTik::diagnostics()->getRaw('/system/identity/print');
-
-// Connection details
-$info = MikroTik::diagnostics()->connectionInfo();
-// ['host' => '...', 'port' => 8728, 'connected' => true, 'protocol' => 'API']
-```
-
----
-
-## Export Manager
-
-> Added in **v1.7.0** — SSH-based config export and diff. Requires `spatie/ssh: ^1.8` and SSH enabled on the router.
-
-```env
-MIKROTIK_SSH_KEY=/home/deploy/.ssh/id_rsa
-```
-
-```php
-// Full router config export
-$raw = MikroTik::export()->exportFull();
-
-// Section-specific export
-$firewallConfig = MikroTik::export()->exportSection('/ip/firewall/filter');
-
-// Parse export text into structured array
-$parsed = MikroTik::export()->parseConfig($raw);
-// ['ip/firewall/filter' => ['add chain=input action=drop ...', ...], ...]
-
-// Diff two config snapshots
-$before = MikroTik::export()->exportFull();
-// ... make changes on router ...
-$after  = MikroTik::export()->exportFull();
-
-$diff = MikroTik::export()->diffConfigs($before, $after);
-// [
-//     'added'            => ['add chain=forward ...'],
-//     'removed'          => ['add chain=input ...'],
-//     'sections_changed' => ['ip/firewall/filter'],
-// ]
-```
-
----
-
-## Generator Streaming
-
-> Added in **v1.7.0** — memory-efficient lazy iteration for large datasets using PHP Generators.
-
-Use streaming methods when you have thousands of PPPoE secrets, DHCP leases, or sessions and need to process them one row at a time without loading everything into memory.
-
-```php
-// Stream PPPoE secrets row by row
-foreach (MikroTik::pppoe()->streamSecrets() as $secret) {
-    // process one secret at a time
-    if ($secret['disabled'] === 'true') {
-        sendBillingAlert($secret['name']);
-    }
-}
-
-// Stream active PPPoE sessions
-foreach (MikroTik::pppoe()->streamSessions() as $session) {
-    updateBandwidthUsage($session['name'], $session['bytes-in'], $session['bytes-out']);
-}
-
-// Stream Hotspot users
-foreach (MikroTik::hotspot()->streamUsers() as $user) { ... }
-foreach (MikroTik::hotspot()->streamSessions() as $session) { ... }
-
-// Stream DHCP leases
-foreach (MikroTik::dhcp()->streamLeases() as $lease) { ... }
-
-// Stream all simple queues
-foreach (MikroTik::queue()->streamQueues() as $queue) { ... }
-
-// Combined PPPoE + Hotspot sessions with 'type' key
-foreach (MikroTik::sessionMonitor()->streamActiveSessions() as $session) {
-    // $session['type'] is 'pppoe' or 'hotspot'
-    echo "{$session['type']}: {$session['name']}";
-}
-```
-
----
-
-## Multi-Router Setup
-
-Manage multiple MikroTik routers from a single Laravel application:
-
-```php
-// Default router (from .env)
-MikroTik::pppoe()->getActiveSessions();
-
-// Named router
+// Multi-router
 MikroTik::router('branch')->pppoe()->getActiveSessions();
-MikroTik::router('main')->system()->getCpuLoad();
 
-// Loop through all routers
-$routers = ['main', 'branch'];
-
-foreach ($routers as $router) {
-    $sessions = MikroTik::router($router)->pppoe()->getActiveSessions();
-    echo "{$router}: " . count($sessions) . " sessions";
-}
-```
-
----
-
-## Events
-
-The package dispatches Laravel events you can listen to:
-
-```php
-// EventServiceProvider or using #[AsEventListener]
-use ZillEAli\MikrotikLaravel\Events\SessionCreated;
-use ZillEAli\MikrotikLaravel\Events\SessionDisconnected;
-use ZillEAli\MikrotikLaravel\Events\RouterUnreachable;
-
-// Listen for new PPPoE session
-Event::listen(SessionCreated::class, function ($event) {
-    Log::info("New session: {$event->username} @ {$event->ip}");
-});
-
-// Listen for disconnection
-Event::listen(SessionDisconnected::class, function ($event) {
-    Log::info("Disconnected: {$event->username}");
-});
-
-// Listen for router going offline
-Event::listen(RouterUnreachable::class, function ($event) {
-    // send alert to NOC team
-    Notification::send($noc, new RouterDownNotification($event->host));
-});
-```
-
----
-
-## Testing with MikrotikFake
-
-> Added in **v1.7.0** — drop-in test helper so your application tests never need to mock `RouterosClient` manually.
-
-`MikrotikFake::fake()` swaps the `MikrotikManager` binding in the Laravel container. Any code in your application that resolves `MikrotikManager` (or uses the `MikroTik` facade) will automatically receive the fake.
-
-### Basic usage
-
-```php
-use ZillEAli\MikrotikLaravel\Testing\MikrotikFake;
-
-it('suspends PPPoE users with overdue invoices', function () {
-    $fake = MikrotikFake::fake([
-        '/ppp/secret/print' => [
-            ['name' => 'ali-home', 'profile' => '10mbps', 'disabled' => 'false'],
-        ],
-    ]);
-
-    // Call your application service that uses MikroTik internally
-    app(SuspendOverdueSubscribers::class)->handle();
-
-    $fake->assertQueried('/ppp/secret/print');
-    $fake->assertQueried('/ppp/secret/set');
-});
-```
-
-### Dynamic response loading
-
-```php
-$fake = MikrotikFake::fake();
-
-// Load responses after creation
-$fake->forCommand('/ip/hotspot/user/print', [
-    ['name' => 'guest001', 'profile' => 'default'],
-]);
-
-// Load stream responses for Generator-based methods
-$fake->forStream('/ppp/secret/print', [
-    ['name' => 'user1', 'profile' => '10mbps'],
-    ['name' => 'user2', 'profile' => '20mbps'],
-]);
-```
-
-### Assertions
-
-```php
-// Assert a command was sent
-$fake->assertQueried('/ppp/secret/print');
-
-// Assert a command was NOT sent
-$fake->assertNotQueried('/system/reboot');
-
-// Assert exact number of commands sent
-$fake->assertQueryCount(3);
-
-// Inspect all commands in order
-$queries = $fake->recordedQueries();
-// ['/ppp/secret/print', '/ppp/secret/set', '/ip/hotspot/user/print']
-```
-
-### Streaming assertions
-
-```php
-$fake = MikrotikFake::fake();
-$fake->forStream('/ppp/secret/print', [
-    ['name' => 'user1'],
-    ['name' => 'user2'],
-]);
-
-$rows = [];
-foreach ($fake->pppoe()->streamSecrets() as $row) {
-    $rows[] = $row;
+// Streaming (v1.7.0)
+foreach (MikroTik::pppoe()->streamSecrets() as $secret) {
+    // process one row at a time — no memory spike
 }
 
-expect($rows)->toHaveCount(2);
+// Testing (v1.7.0)
+$fake = MikrotikFake::fake(['/ppp/secret/print' => [['name' => 'ali-home']]]);
 $fake->assertQueried('/ppp/secret/print');
 ```
-
----
-
-## Laravel Pulse Integration
-
-> Added in **v1.7.0** — requires `laravel/pulse: ^1.0`.
-
-The `RouterHealthCard` displays CPU%, memory%, API latency, and uptime ratio directly in your Laravel Pulse dashboard. Data is collected every 60 seconds by `RouterHealthRecorder` running via `php artisan pulse:check`.
-
-### Setup
-
-```bash
-composer require laravel/pulse
-```
-
-Register the recorder in `config/pulse.php`:
-
-```php
-'recorders' => [
-    \ZillEAli\MikrotikLaravel\Pulse\Recorders\RouterHealthRecorder::class => [
-        'router_name' => 'main',  // label shown in the card
-    ],
-],
-```
-
-Add the card to your Pulse dashboard view (`resources/views/vendor/pulse/dashboard.blade.php`):
-
-```blade
-<livewire:pulse.mikrotik-router-health cols="4" rows="2" />
-```
-
-Start the Pulse worker:
-
-```bash
-php artisan pulse:check
-```
-
-### Custom views
-
-Publish the Blade view to customize styles or layout:
-
-```bash
-php artisan vendor:publish --tag=mikrotik-pulse-views
-```
-
-This copies the card view to `resources/views/vendor/mikrotik-laravel/pulse/router-health.blade.php`.
-
-### Multi-router
-
-Add one recorder entry per router in `config/pulse.php` — each uses a distinct `router_name` key so cards display side by side.
-
----
-
-## Filament Integration
-
-Register widgets in your Filament panel provider:
-
-```php
-use ZillEAli\MikrotikLaravel\Filament\Widgets\ActiveSessionsWidget;
-use ZillEAli\MikrotikLaravel\Filament\Widgets\BandwidthChartWidget;
-use ZillEAli\MikrotikLaravel\Filament\Widgets\RouterHealthWidget;
-use ZillEAli\MikrotikLaravel\Filament\Widgets\InterfaceTableWidget;
-
-public function panel(Panel $panel): Panel
-{
-    return $panel
-        ->widgets([
-            ActiveSessionsWidget::class,   // live PPPoE + hotspot count
-            BandwidthChartWidget::class,   // TX/RX line chart
-            RouterHealthWidget::class,     // CPU, RAM, temp bars
-            InterfaceTableWidget::class,   // interface up/down table
-        ]);
-}
-```
-
----
-
-## Testing
-
-Run the test suite:
-
-```bash
-composer test
-```
-
-Or with Pest directly:
-
-```bash
-./vendor/bin/pest --no-coverage
-```
-
-The package uses **mock RouterOS clients** for all tests — no real router required. All managers are tested with:
-
-- CRUD operations
-- Bulk operations
-- Edge cases (empty results, not found)
-- Exception handling
-
----
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for a full version history.
-
-**v1.7.0** — MikrotikFake test helper, Laravel Pulse RouterHealth card, DiagnosticsManager, ExportManager (SSH), Generator streaming, socket timeout config.
-
-**v1.6.0** — Centralized PSR-3 logging via MikrotikLogger across all 22 managers.
-
-**v1.5.0** — Input validation, ResourceNotFoundException, `.id` validation, structured exceptions.
-
-**v1.4.0** — PHPStan level 5, ConnectionException / ApiException factory methods.
 
 ---
 
 ## Contributing
 
-Contributions are welcome. Please:
-
 1. Fork the repo
-2. Create a feature branch (`git checkout -b feature/wireless-manager`)
+2. Create a feature branch (`git checkout -b feature/your-feature`)
 3. Write tests first — red then green
-4. Submit a PR to `develop` branch
+4. Submit a PR to the `develop` branch
 
 ---
 
